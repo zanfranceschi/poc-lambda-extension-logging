@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+
 
 namespace Poc.LambdaExtension.Logging
 {
@@ -21,7 +17,7 @@ namespace Poc.LambdaExtension.Logging
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                    webBuilder.UseUrls("http://localhost:9999");
+                    webBuilder.UseUrls($"http://+:{Configs.AGENT_LOGSAPI_PORT}");
                 });
     }
 }
