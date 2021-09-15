@@ -5,8 +5,6 @@ rm -rf extensions/*
 
 dotnet publish -c Release -f net5.0 -p:Platform=x64 -p:DebugType=None -o bin/publish
 
-rm -rf extensions/appsettings.Development.json
-
 mv bin/publish/* extensions
 mv extensions/Poc.LambdaExtension.Logging extensions/poc-lambda-extension-logging
 

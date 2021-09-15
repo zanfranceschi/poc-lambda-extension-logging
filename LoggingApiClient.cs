@@ -9,6 +9,9 @@ namespace Poc.LambdaExtension.Logging
 {
     public class LoggingApiClient
     {
+        private const string LAMBDA_EXTENSION_ID_HEADER = "Lambda-Extension-Identifier";
+        private const string LAMBDA_EXTENSION_NAME_HEADER = "Lambda-Extension-Name";
+        private const string LAMBDA_RUNTIME_API_ADDRESS = "AWS_LAMBDA_RUNTIME_API";
         private readonly HttpClient _httpClient;
         private readonly Uri _loggingApiUrl;
         private readonly ILogger<LoggingApiClient> _logger;
@@ -18,7 +21,7 @@ namespace Poc.LambdaExtension.Logging
             _logger = logger;
             _httpClient = httpClient;
 
-            var runtimeApiAddress = Environment.GetEnvironmentVariable(Configs.LAMBDA_RUNTIME_API_ADDRESS_ENV_VAR);
+            var runtimeApiAddress = Environment.GetEnvironmentVariable(LAMBDA_RUNTIME_API_ADDRESS);
             _loggingApiUrl = new Uri($"http://{runtimeApiAddress}/2020-08-15/logs");
         }
 
@@ -28,6 +31,8 @@ namespace Poc.LambdaExtension.Logging
                 https://docs.aws.amazon.com/lambda/latest/dg/runtimes-logs-api.html
             */
 
+            _logger.LogInformation($"subscribing to logs API with agentId {agendId}...");
+
             var subscriptionPayload = new
             {
                 destination = new
@@ -36,7 +41,6 @@ namespace Poc.LambdaExtension.Logging
                     URI = $"http://sandbox.localdomain:{Configs.AGENT_LOGSAPI_PORT}/logging" // apontar para o LogginController!
                 },
                 types = new string[] { "platform", "function" },
-                //types = new string[] { "function" },
                 buffering = new
                 {
                     timeoutMs = 1000,
@@ -47,13 +51,15 @@ namespace Poc.LambdaExtension.Logging
 
             var content = new StringContent(JsonSerializer.Serialize(subscriptionPayload));
             content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
-            content.Headers.Add(Configs.LAMBDA_EXTENSION_ID_HEADER, agendId);
+            content.Headers.Add(LAMBDA_EXTENSION_ID_HEADER, agendId);
             var response = await _httpClient.PutAsync(_loggingApiUrl, content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             _logger.LogInformation($"response: {responseContent}");
 
             response.EnsureSuccessStatusCode();
+
+            _logger.LogInformation($"subscribed to logs API.");
 
             await Task.CompletedTask;
         }

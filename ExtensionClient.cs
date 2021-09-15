@@ -22,6 +22,9 @@ namespace Poc.LambdaExtension.Logging
     {
         private const string LAMBDA_EXTENSION_NAME_HEADER = "Lambda-Extension-Name";
         private const string LAMBDA_EXTENSION_FUNCTION_ERROR_TYPE_HEADER = "Lambda-Extension-Function-Error-Type";
+        private const string LAMBDA_EXTENSION_ID_HEADER = "Lambda-Extension-Identifier";
+        private const string LAMBDA_RUNTIME_API_ADDRESS = "AWS_LAMBDA_RUNTIME_API";
+        
         public string Id { get; private set; }
         private readonly HttpClient _httpClient;
         private readonly string _extensionName;
@@ -33,12 +36,14 @@ namespace Poc.LambdaExtension.Logging
         public ExtensionClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
+            _httpClient.Timeout = Timeout.InfiniteTimeSpan;
+
             _extensionName = "poc-lambda-extension-logging";
 
             // Set infinite timeout so that underlying connection is kept alive
             _httpClient.Timeout = Timeout.InfiniteTimeSpan;
             // Get Extension API service base URL from the environment variable
-            var apiUri = new UriBuilder(Environment.GetEnvironmentVariable(Configs.LAMBDA_RUNTIME_API_ADDRESS_ENV_VAR)).Uri;
+            var apiUri = new UriBuilder(Environment.GetEnvironmentVariable(LAMBDA_RUNTIME_API_ADDRESS)).Uri;
             // Common path for all Extension API URLs
             var basePath = "2020-01-01/extension";
 
@@ -49,11 +54,13 @@ namespace Poc.LambdaExtension.Logging
             _shutdownErrorUrl = new Uri(apiUri, $"{basePath}/exit/error");
         }
 
-        public async Task ProcessEvents(Func<string, Task> onInit = null, Func<string, Task> onInvoke = null, Func<string, Task> onShutdown = null)
+        public async Task ProcessEvents(
+            Func<string, Task> onInit = null,
+            Func<string, Task> onInvoke = null,
+            Func<string, Task> onShutdown = null)
         {
-            // Register extension with AWS Lambda Extension API to handle both INVOKE and SHUTDOWN events
             await RegisterExtensionAsync(ExtensionEvent.INVOKE, ExtensionEvent.SHUTDOWN);
-
+            
             // If onInit function is defined, invoke it and report any unhandled exceptions
             if (!await SafeInvoke(onInit, Id, ex => ReportErrorAsync(_initErrorUrl, "Fatal.Unhandled", ex))) return;
 
@@ -71,7 +78,7 @@ namespace Poc.LambdaExtension.Logging
                         // event loop will continue even if there was an exception
                         await SafeInvoke(onInvoke, payload, onException: ex =>
                         {
-                            Console.WriteLine($"[{_extensionName}] Invoke handler threw an exception");
+                            Console.WriteLine($"[{_extensionName}] Invoke handler threw an exception: {ex}");
                             return Task.CompletedTask;
                         });
                         break;
@@ -86,7 +93,7 @@ namespace Poc.LambdaExtension.Logging
             }
         }
 
-        private async Task RegisterExtensionAsync(params ExtensionEvent[] events)
+        private async Task<string> RegisterExtensionAsync(params ExtensionEvent[] events)
         {
             // custom options for JsonSerializer to serialize ExtensionEvent enum values as strings, rather than integers
             // thus we produce strongly typed code, which doesn't rely on strings
@@ -94,6 +101,7 @@ namespace Poc.LambdaExtension.Logging
             options.Converters.Add(new JsonStringEnumConverter());
 
             // create Json content for this extension registration
+            //ExtensionEvent[] events = new ExtensionEvent[] { ExtensionEvent.INVOKE, ExtensionEvent.SHUTDOWN };
             using var content = new StringContent(JsonSerializer.Serialize(new
             {
                 events
@@ -115,7 +123,7 @@ namespace Poc.LambdaExtension.Logging
             }
 
             // get registration id from the response header
-            Id = response.Headers.GetValues(Configs.LAMBDA_EXTENSION_ID_HEADER).FirstOrDefault();
+            Id = response.Headers.GetValues(LAMBDA_EXTENSION_ID_HEADER).FirstOrDefault();
             // if registration id is empty
             if (string.IsNullOrEmpty(Id))
             {
@@ -123,7 +131,9 @@ namespace Poc.LambdaExtension.Logging
                 throw new ApplicationException("Extension API register call didn't return a valid identifier.");
             }
             // configure all HttpClient to send registration id header along with all subsequent requests
-            _httpClient.DefaultRequestHeaders.Add(Configs.LAMBDA_EXTENSION_ID_HEADER, Id);
+            _httpClient.DefaultRequestHeaders.Add(LAMBDA_EXTENSION_ID_HEADER, Id);
+
+            return Id;
         }
 
         /// <summary>
@@ -147,7 +157,7 @@ namespace Poc.LambdaExtension.Logging
         private async Task ReportErrorAsync(Uri url, string errorType, Exception exception)
         {
             using var content = new StringContent(string.Empty);
-            content.Headers.Add(Configs.LAMBDA_EXTENSION_ID_HEADER, Id);
+            content.Headers.Add(LAMBDA_EXTENSION_ID_HEADER, Id);
             content.Headers.Add(LAMBDA_EXTENSION_FUNCTION_ERROR_TYPE_HEADER, $"{errorType}.{exception.GetType().Name}");
 
             using var response = await _httpClient.PostAsync(url, content);

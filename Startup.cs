@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Amazon.S3;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -19,12 +20,18 @@ namespace Poc.LambdaExtension.Logging
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddAWSService<IAmazonS3>();
+            ConcurrentQueue<string> logsEventQueue = new ConcurrentQueue<string>();
+
+            services.AddSingleton<ConcurrentQueue<string>>(logsEventQueue);
+            
             services.AddControllers();
-            services.AddHttpClient();
-            services.AddTransient<ExtensionClient>();
-            services.AddTransient<LoggingApiClient>();
-            services.AddHostedService<ExtensionBackgroundWorker>();
+            services.AddAWSService<IAmazonS3>();
+            
+            services.AddHttpClient<ExtensionClient>();
+            services.AddHttpClient<LoggingApiClient>();
+            
+            services.AddSingleton<ExtensionClient>();
+            services.AddSingleton<LoggingApiClient>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
