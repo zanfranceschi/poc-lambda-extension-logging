@@ -62,6 +62,8 @@ namespace Poc.LambdaExtension.Logging
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            await EnsureLogsApiIsRunning();
+            
             await _extensionClient.ProcessEvents(
                 onInit: async agentId =>
                 {
@@ -77,6 +79,32 @@ namespace Poc.LambdaExtension.Logging
                     _logger.LogInformation($"shutdown: {payload}");
                     return ProcessLogsEvents();
                 });
+        }
+
+        private async Task EnsureLogsApiIsRunning() 
+        {
+            _logger.LogInformation($"Checking for Logs API service...");
+            bool isRunning = false;
+            while (isRunning == false) 
+            {
+                try 
+                {
+                    var response = await _httpClient.GetAsync($"http://127.0.0.1:{Configs.AGENT_LOGSAPI_PORT}/logging");
+                    if (response.IsSuccessStatusCode) 
+                    {
+                        isRunning = true;
+                        _logger.LogInformation($"Logs API service is ok.");
+                    }
+                    else 
+                    {
+                        _logger.LogInformation($"Logs API service is not ok: {await response.Content.ReadAsStringAsync()}");
+                    }
+                }
+                catch(Exception ex) 
+                {
+                    _logger.LogError(ex, "Error checking Logs API");
+                }
+            }
         }
 
         private async Task ProcessLogsEvents()
