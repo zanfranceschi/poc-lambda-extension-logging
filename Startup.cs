@@ -1,11 +1,12 @@
 using System.Collections.Concurrent;
 using Amazon.S3;
+using Amazon.KinesisFirehose;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-
+using Amazon.Kinesis;
 
 namespace Poc.LambdaExtension.Logging
 {
@@ -26,6 +27,8 @@ namespace Poc.LambdaExtension.Logging
             
             services.AddControllers();
             services.AddAWSService<IAmazonS3>();
+            services.AddAWSService<IAmazonKinesisFirehose>();
+            services.AddAWSService<IAmazonKinesis>();
             
             services.AddHttpClient<ExtensionClient>();
             services.AddHttpClient<LoggingApiClient>();

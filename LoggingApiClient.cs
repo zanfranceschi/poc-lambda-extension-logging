@@ -43,6 +43,12 @@ namespace Poc.LambdaExtension.Logging
                 types = new string[] { "platform", "function" },
                 buffering = new
                 {
+                    /*
+                        timeoutMs – The maximum time (in milliseconds) to buffer a batch. Default: 1,000. Minimum: 25. Maximum: 30,000.
+                        maxBytes – The maximum size (in bytes) of the logs to buffer in memory. Default: 262,144. Minimum: 262,144. Maximum: 1,048,576.
+                        maxItems – The maximum number of events to buffer in memory. Default: 10,000. Minimum: 1,000. Maximum: 10,000.
+                    */
+
                     timeoutMs = 1000,
                     maxBytes = 262144,
                     maxItems = 1000

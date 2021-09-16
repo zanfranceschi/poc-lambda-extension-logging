@@ -18,15 +18,14 @@ namespace Poc.LambdaExtension.Logging
                 .ConfigureLogging(logging =>
                     logging.AddFilter((provider, category, logLevel) =>
                     {
-                        //return logLevel >= LogLevel.Information;
-                        return category.Contains("Poc") && logLevel >= LogLevel.Information;
+                        return category.Contains("Poc.LambdaExtension.Logging") && logLevel >= LogLevel.Information;
                     }))
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
                     webBuilder.UseUrls($"http://+:{Configs.AGENT_LOGSAPI_PORT}");
                 })
-                .ConfigureServices(services =>
+                .ConfigureServices(services => 
                 {
                     services.AddHttpClient<LogsEventsProcessingWorker>();
                     services.AddHostedService<LogsEventsProcessingWorker>();

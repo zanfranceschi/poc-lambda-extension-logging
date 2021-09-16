@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -9,8 +10,8 @@ namespace Poc.LambdaExtension.Logging.Controllers
     public class LoggingController : ControllerBase
     {
         private readonly ILogger<LoggingController> _logger;
-        
-        private ConcurrentQueue<string> _logsQueue;
+
+        private readonly ConcurrentQueue<string> _logsQueue;
 
         public LoggingController(
             ILogger<LoggingController> logger,
@@ -30,8 +31,16 @@ namespace Poc.LambdaExtension.Logging.Controllers
         [HttpPost]
         public IActionResult LogsCallback(object payload)
         {
-            _logsQueue.Enqueue(payload.ToString());
-            return Ok(new { message = "ok" });
+            try
+            {
+                _logsQueue.Enqueue(payload.ToString());
+                return Ok(new { message = "ok" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error@LogsCallback");
+                throw;
+            }
         }
     }
 }

@@ -1,8 +1,17 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
 using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
+using Amazon.Kinesis;
+using Amazon.KinesisFirehose;
+using Amazon.KinesisFirehose.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Hosting;
@@ -19,6 +28,8 @@ namespace Poc.LambdaExtension.Logging
         private readonly LoggingApiClient _loggingApiClient;
         private readonly ConcurrentQueue<string> _logsQueue;
         private readonly IAmazonS3 _s3Client;
+        private readonly IAmazonKinesisFirehose _kinesisFirehoseClient;
+        private readonly IAmazonKinesis _kinesisClient;
         private readonly string _bucketName;
         private readonly string _bucketKeyPrefeix;
         private readonly string _functionName;
@@ -29,6 +40,8 @@ namespace Poc.LambdaExtension.Logging
             ExtensionClient extensionClient,
             LoggingApiClient loggingApiClient,
             IAmazonS3 s3Client,
+            IAmazonKinesisFirehose kinesisFirehoseClient,
+            IAmazonKinesis kinesisClient,
             ConcurrentQueue<string> logsQueue
             )
         {
@@ -38,6 +51,8 @@ namespace Poc.LambdaExtension.Logging
             _loggingApiClient = loggingApiClient;
 
             _s3Client = s3Client;
+            _kinesisFirehoseClient = kinesisFirehoseClient;
+            _kinesisClient = kinesisClient;
             _logsQueue = logsQueue;
 
             _bucketName = "zanfranceschi";
@@ -67,32 +82,51 @@ namespace Poc.LambdaExtension.Logging
         private async Task ProcessLogsEvents()
         {
             string logsEventPayload;
-            while (_logsQueue.TryDequeue(out logsEventPayload) == false)
+            while (_logsQueue.TryDequeue(out logsEventPayload))
             {
-                await Task.Delay(1);
-            }
-
-            try
-            {
-                _logger.LogInformation($"executing HandleLogsEvent with payload {logsEventPayload}");
-
-                var date = DateTime.Now;
-                string key = $"{_bucketKeyPrefeix}/{_functionName}/{date.ToString("yyyy-MM")}/{Guid.NewGuid().ToString("N").ToUpper()}";
-
-                var request = new PutObjectRequest
+                try
                 {
-                    BucketName = _bucketName,
-                    ContentBody = logsEventPayload,
-                    Key = key
-                };
+                    // S3
+                    _logger.LogInformation($"executing ProcessLogsEvents with payload {logsEventPayload}");
 
-                var response = await _s3Client.PutObjectAsync(request);
-                _logger.LogInformation($"response.HttpStatusCode: {response.HttpStatusCode}");
+                    var date = DateTime.Now;
+                    string key = $"{_bucketKeyPrefeix}/{_functionName}/{date.ToString("yyyy-MM")}/{Guid.NewGuid().ToString("N").ToUpper()}";
 
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error executing LogsCallback");
+                    var request = new PutObjectRequest
+                    {
+                        BucketName = _bucketName,
+                        ContentBody = logsEventPayload,
+                        Key = key
+                    };
+
+                    var response = await _s3Client.PutObjectAsync(request);
+
+                    // using var stream = new MemoryStream(Encoding.UTF8.GetBytes(logsEventPayload));
+
+                    
+                    // Firehose
+                    // var record = new Record 
+                    // {
+                    //     Data = stream
+                    // };
+                    // var kinesisPutResponse = await _kinesisFirehoseClient.PutRecordAsync("logs-s3", record);
+
+
+                    // Kinesis Data Streams
+                    // var response = await _kinesisClient.PutRecordAsync(new Amazon.Kinesis.Model.PutRecordRequest
+                    // {
+                    //     Data = stream,
+                    //     StreamName = "logs-s3",
+                    //     PartitionKey = Guid.NewGuid().ToString()
+                    // });
+
+                    // _logger.LogInformation($"logged to shard {response.ShardId}");
+                    
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error executing LogsCallback");
+                }
             }
         }
     }

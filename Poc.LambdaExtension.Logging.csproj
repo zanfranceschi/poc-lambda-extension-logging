@@ -20,6 +20,8 @@
   
   <ItemGroup>
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.1" />
+    <PackageReference Include="AWSSDK.Kinesis" Version="3.7.0.66" />
+    <PackageReference Include="AWSSDK.KinesisFirehose" Version="3.7.1.10" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.2.5" />
   </ItemGroup>
 

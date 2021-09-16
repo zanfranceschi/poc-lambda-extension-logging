@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Poc.LambdaExtension.Logging
 {
@@ -25,6 +26,8 @@ namespace Poc.LambdaExtension.Logging
         private const string LAMBDA_EXTENSION_ID_HEADER = "Lambda-Extension-Identifier";
         private const string LAMBDA_RUNTIME_API_ADDRESS = "AWS_LAMBDA_RUNTIME_API";
         
+        private readonly ILogger<ExtensionClient> _logger;
+        
         public string Id { get; private set; }
         private readonly HttpClient _httpClient;
         private readonly string _extensionName;
@@ -33,8 +36,10 @@ namespace Poc.LambdaExtension.Logging
         private readonly Uri _initErrorUrl;
         private readonly Uri _shutdownErrorUrl;
 
-        public ExtensionClient(HttpClient httpClient)
+        public ExtensionClient(ILogger<ExtensionClient> logger, HttpClient httpClient)
         {
+            _logger = logger;
+            
             _httpClient = httpClient;
             _httpClient.Timeout = Timeout.InfiniteTimeSpan;
 
@@ -78,7 +83,7 @@ namespace Poc.LambdaExtension.Logging
                         // event loop will continue even if there was an exception
                         await SafeInvoke(onInvoke, payload, onException: ex =>
                         {
-                            Console.WriteLine($"[{_extensionName}] Invoke handler threw an exception: {ex}");
+                            _logger.LogError(ex, $"[{_extensionName}] Invoke handler threw an exception");
                             return Task.CompletedTask;
                         });
                         break;
@@ -117,7 +122,7 @@ namespace Poc.LambdaExtension.Logging
             if (!response.IsSuccessStatusCode)
             {
                 // log details
-                Console.WriteLine($"[{_extensionName}] Error response received for registration request: {await response.Content.ReadAsStringAsync()}");
+                _logger.LogInformation($"[{_extensionName}] Error response received for registration request: {await response.Content.ReadAsStringAsync()}");
                 // throw an unhandled exception, so that extension is terminated by Lambda runtime
                 response.EnsureSuccessStatusCode();
             }
@@ -163,7 +168,7 @@ namespace Poc.LambdaExtension.Logging
             using var response = await _httpClient.PostAsync(url, content);
             if (!response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"[{_extensionName}] Error response received for {url.PathAndQuery}: {await response.Content.ReadAsStringAsync()}");
+                _logger.LogError(new EventId(1), $"[{_extensionName}] Error response received for {url.PathAndQuery}: {await response.Content.ReadAsStringAsync()}");
                 response.EnsureSuccessStatusCode();
             }
         }
